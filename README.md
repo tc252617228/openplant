@@ -227,7 +227,7 @@ Run all benchmarks with:
 go test -bench . ./...
 ```
 
-Run the Phase 6 subset with:
+Run a focused benchmark subset with:
 
 ```powershell
 go test -run '^$' -bench 'Benchmark(StreamNative|DecodeNative|EncodeNative|EncodeRealtime|EncodeArchive|TSValue|DecodeDataSet|RowDecoder|PointCache|ScanRows|PoolAcquireRelease|TableSelect|Subscription|ArchiveQuerySQLRows|StatQuerySQLRows)' -benchtime=100x ./...
@@ -274,3 +274,4 @@ See `docs-contract.md` for the V5 contract extracted from the provided PDFs.
 - [Examples](examples/README.md)
 - [Migration notes](MIGRATION.md)
 - [Benchmark notes](benchmarks/README.md)
+- [AI skill](skill/openplant-sdk/SKILL.md)

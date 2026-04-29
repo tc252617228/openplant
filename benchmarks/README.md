@@ -18,7 +18,7 @@ Run all benchmarks:
 go test -bench . ./...
 ```
 
-Run the Phase 6 benchmark subset:
+Run a focused benchmark subset:
 
 ```powershell
 go test -run '^$' -bench 'Benchmark(StreamNative|DecodeNative|EncodeNative|EncodeRealtime|EncodeArchive|TSValue|DecodeDataSet|RowDecoder|PointCache|ScanRows|PoolAcquireRelease|TableSelect|Subscription|ArchiveQuerySQLRows|StatQuerySQLRows)' -benchtime=100x ./...

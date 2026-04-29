@@ -1,0 +1,4 @@
+interface:
+  display_name: "OpenPlant SDK"
+  short_description: "Build and maintain the OpenPlant Go SDK"
+  default_prompt: "Use $openplant-sdk to work on the OpenPlant Go SDK safely."
