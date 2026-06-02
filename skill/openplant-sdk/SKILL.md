@@ -48,6 +48,11 @@ Treat this repository as a low-level driver foundation:
   compression is server-selected.
 - Do not add preferred, auto, adaptive, fallback, or retry compression modes to
   the base SDK. Add higher-level policy outside the driver if needed.
+- Treat small-payload compression misses as real strict-mode failures. Do not
+  silently skip compression for small requests, send the original payload, retry
+  uncompressed, or reclassify the frame as `CompressionNone`.
+- Do not let the SDK decide performance policy. Default uncompressed transport
+  is intentional; compression must remain a caller-selected connection option.
 
 ## Workflow
 

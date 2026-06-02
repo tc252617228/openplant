@@ -40,6 +40,12 @@ should own that behavior outside the base API.
   checksums, unsupported wire modes, and decompression failures all return
   errors. Never silently send the original payload after a strict compression
   miss.
+- Strict mode also applies to small payloads. Do not add automatic small-request
+  uncompressed sends, preferred modes, fallback modes, adaptive modes, or
+  transparent retries in the base SDK.
+- `CompressionNone` is the default by design. The SDK must not auto-enable
+  compression based on payload size, server version, observed traffic, or
+  benchmark results.
 - Server responses are decoded by the wire mode in the frame header, not by the
   outbound mode chosen by the client.
 - Low-level `Conn` is intentionally narrow: `Ping`, `Close`, and
