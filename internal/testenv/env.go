@@ -3,6 +3,7 @@ package testenv
 import (
 	"os"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/tc252617228/openplant/model"
@@ -29,12 +30,16 @@ func Load(prefix string) Config {
 	if raw := os.Getenv(prefix + "_PORT"); raw != "" {
 		if parsed, err := strconv.Atoi(raw); err == nil {
 			port = parsed
+		} else {
+			port = 0
 		}
 	}
 	var pointID model.PointID
 	if raw := os.Getenv(prefix + "_POINT_ID"); raw != "" {
 		if parsed, err := strconv.ParseInt(raw, 10, 32); err == nil {
 			pointID = model.PointID(parsed)
+		} else {
+			pointID = -1
 		}
 	}
 	return Config{
@@ -57,6 +62,17 @@ func RequireSafeReadonly(t testing.TB) Config {
 	if cfg.Host == "" || cfg.User == "" || cfg.Pass == "" {
 		t.Skip("OPENPLANT_TEST_HOST/USER/PASS are required for safe readonly integration tests")
 	}
+	if cfg.Port <= 0 || cfg.Port > 65535 {
+		t.Fatalf("OPENPLANT_TEST_PORT must be between 1 and 65535")
+	}
+	if cfg.PointID < 0 {
+		t.Fatalf("OPENPLANT_TEST_POINT_ID must be a positive int32 when set")
+	}
+	if cfg.PointGN != "" {
+		if err := cfg.PointGN.Validate(); err != nil {
+			t.Fatalf("OPENPLANT_TEST_POINT_GN is invalid: %v", err)
+		}
+	}
 	if !cfg.ReadOnly {
 		t.Fatalf("safe readonly integration tests require OPENPLANT_TEST_READONLY=1 or unset")
 	}
@@ -72,11 +88,20 @@ func RequireMutation(t testing.TB) Config {
 	if cfg.Host == "" || cfg.User == "" || cfg.Pass == "" {
 		t.Fatalf("mutation tests require OPENPLANT_TEST_HOST/USER/PASS")
 	}
+	if cfg.Port <= 0 || cfg.Port > 65535 {
+		t.Fatalf("OPENPLANT_TEST_PORT must be between 1 and 65535")
+	}
 	if cfg.ReadOnly {
 		t.Fatalf("mutation tests require OPENPLANT_TEST_READONLY=0")
 	}
 	if cfg.DB == "" || cfg.Prefix == "" {
 		t.Fatalf("mutation tests require OPENPLANT_TEST_DB and OPENPLANT_TEST_PREFIX")
+	}
+	if err := model.DatabaseName(cfg.DB).Validate(); err != nil {
+		t.Fatalf("mutation tests require a valid OPENPLANT_TEST_DB: %v", err)
+	}
+	if !strings.HasPrefix(strings.ToUpper(cfg.Prefix), "SDK") {
+		t.Fatalf("mutation tests require OPENPLANT_TEST_PREFIX to start with SDK")
 	}
 	return cfg
 }

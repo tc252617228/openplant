@@ -118,6 +118,20 @@ func TestStatQueryUsesBoundedReadonlySQL(t *testing.T) {
 	}
 }
 
+func TestStatQueryRejectsGNFromDifferentDatabase(t *testing.T) {
+	begin := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
+	err := Query{
+		DB:       "W3",
+		GNs:      []model.GN{"X.N.P1"},
+		Range:    model.TimeRange{Begin: begin, End: begin.Add(time.Hour)},
+		Mode:     model.ModeAvg,
+		Interval: "1m",
+	}.Validate()
+	if err == nil {
+		t.Fatalf("expected cross-database GN to be rejected")
+	}
+}
+
 func TestStatQuerySQLPreservesMillisecondTimeBounds(t *testing.T) {
 	begin := time.Date(2026, 1, 2, 3, 4, 5, 123456789, time.UTC)
 	end := time.Date(2026, 1, 2, 3, 4, 6, 987654321, time.UTC)

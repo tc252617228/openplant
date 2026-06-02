@@ -3,6 +3,7 @@ package transport
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"sync"
@@ -28,6 +29,10 @@ type Conn struct {
 
 func Dial(ctx context.Context, cfg Config) (*Conn, error) {
 	cfg = cfg.withDefaults()
+	if !cfg.Compression.Valid() {
+		err := fmt.Errorf("%w: %d", codec.ErrUnsupportedCompression, cfg.Compression)
+		return nil, classifyErr("transport.Dial.compression", err)
+	}
 	ctx, cancel := protocol.WithTimeout(ctx, cfg.DialTimeout)
 	defer cancel()
 
@@ -38,7 +43,7 @@ func Dial(ctx context.Context, cfg Config) (*Conn, error) {
 	conn := &Conn{
 		netConn: raw,
 		reader:  codec.NewFrameReader(raw),
-		writer:  codec.NewFrameWriter(raw, cfg.Compression),
+		writer:  codec.NewFrameWriter(raw, codec.CompressionNone),
 	}
 	cleanup := conn.bindContextWithCleanup(ctx)
 	defer cleanup()
@@ -47,6 +52,10 @@ func Dial(ctx context.Context, cfg Config) (*Conn, error) {
 	if err := conn.login(loginCtx, cfg.User, cfg.Password); err != nil {
 		_ = raw.Close()
 		return nil, err
+	}
+	if err := conn.SetCompression(cfg.Compression); err != nil {
+		_ = raw.Close()
+		return nil, classifyErr("transport.Dial.compression", err)
 	}
 	_ = raw.SetDeadline(time.Time{})
 	return conn, nil
@@ -104,10 +113,16 @@ func (c *Conn) ClientAddress() string {
 	return c.clientIP
 }
 
-func (c *Conn) SetCompression(mode codec.CompressionMode) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.writer.SetCompression(mode)
+func (c *Conn) SetCompression(mode codec.CompressionMode) error {
+	c.writeMu.Lock()
+	defer c.writeMu.Unlock()
+	return c.writer.SetCompression(mode)
+}
+
+func (c *Conn) CompressionMode() codec.CompressionMode {
+	c.writeMu.Lock()
+	defer c.writeMu.Unlock()
+	return c.writer.CompressionMode()
 }
 
 func (c *Conn) Request(ctx context.Context, payload []byte) ([]byte, error) {
@@ -274,8 +289,9 @@ func (c *Conn) ensureOpen() error {
 }
 
 func (c *Conn) bindContextWithCleanup(ctx context.Context) func() {
+	binding := &deadlineBinding{conn: c.netConn}
 	if deadline, ok := ctx.Deadline(); ok {
-		_ = c.netConn.SetDeadline(deadline)
+		binding.set(deadline)
 	}
 	var done chan struct{}
 	if ctx.Done() != nil {
@@ -283,7 +299,7 @@ func (c *Conn) bindContextWithCleanup(ctx context.Context) func() {
 		go func() {
 			select {
 			case <-ctx.Done():
-				_ = c.netConn.SetDeadline(time.Now())
+				binding.expire()
 			case <-done:
 			}
 		}()
@@ -292,8 +308,34 @@ func (c *Conn) bindContextWithCleanup(ctx context.Context) func() {
 		if done != nil {
 			close(done)
 		}
-		_ = c.netConn.SetDeadline(time.Time{})
+		binding.clear()
 	}
+}
+
+type deadlineBinding struct {
+	mu      sync.Mutex
+	conn    net.Conn
+	stopped bool
+}
+
+func (b *deadlineBinding) set(deadline time.Time) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.stopped {
+		return
+	}
+	_ = b.conn.SetDeadline(deadline)
+}
+
+func (b *deadlineBinding) expire() {
+	b.set(time.Now())
+}
+
+func (b *deadlineBinding) clear() {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.stopped = true
+	_ = b.conn.SetDeadline(time.Time{})
 }
 
 func classifyErr(op string, err error) error {
@@ -309,12 +351,19 @@ func classifyErr(op string, err error) error {
 	if errors.Is(err, codec.ErrUnsupportedCompression) {
 		return operror.Wrap(operror.KindProtocol, op, err)
 	}
+	if errors.Is(err, codec.ErrCompressionFailed) || errors.Is(err, codec.ErrDecompressionFailed) {
+		return operror.Wrap(operror.KindProtocol, op, err)
+	}
 	var netErr net.Error
 	if errors.As(err, &netErr) {
 		if netErr.Timeout() {
 			return operror.Wrap(operror.KindTimeout, op, err)
 		}
 		return operror.Wrap(operror.KindNetwork, op, err)
+	}
+	var opErr *operror.Error
+	if errors.As(err, &opErr) {
+		return err
 	}
 	if errors.Is(err, io.EOF) {
 		return operror.Wrap(operror.KindNetwork, op, err)
@@ -332,7 +381,8 @@ func ShouldDrop(err error) bool {
 	if operror.IsKind(err, operror.KindNetwork) ||
 		operror.IsKind(err, operror.KindTimeout) ||
 		operror.IsKind(err, operror.KindCanceled) ||
-		operror.IsKind(err, operror.KindProtocol) {
+		operror.IsKind(err, operror.KindProtocol) ||
+		operror.IsKind(err, operror.KindDecode) {
 		return true
 	}
 	var netErr net.Error

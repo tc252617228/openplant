@@ -22,7 +22,7 @@ func (r ReadRequest) Validate() error {
 	if err := r.DB.Validate(); err != nil {
 		return err
 	}
-	return (model.PointSelector{IDs: r.IDs, GNs: r.GNs}).ValidateBounded()
+	return (model.PointSelector{IDs: r.IDs, GNs: r.GNs}).ValidateBoundedInDatabase(r.DB)
 }
 
 func (r ReadRequest) ValidateNative() error {
@@ -81,6 +81,11 @@ func (r WriteRequest) Validate() error {
 	for _, value := range r.Values {
 		if err := value.Validate(); err != nil {
 			return err
+		}
+		if value.GN != "" {
+			if err := value.GN.ValidateInDatabase(r.DB); err != nil {
+				return err
+			}
 		}
 	}
 	if r.ChunkSize < 0 {

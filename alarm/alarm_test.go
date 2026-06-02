@@ -93,6 +93,18 @@ func TestActiveSQLUsesBoundedReadonlySQL(t *testing.T) {
 	}
 }
 
+func TestHistoryQueryRejectsGNFromDifferentDatabase(t *testing.T) {
+	begin := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
+	err := HistoryQuery{
+		DB:    "W3",
+		GNs:   []model.GN{"X.N.P1"},
+		Range: model.TimeRange{Begin: begin, End: begin.Add(time.Hour)},
+	}.Validate()
+	if err == nil {
+		t.Fatalf("expected cross-database GN to be rejected")
+	}
+}
+
 func TestAlarmFromOPConsoleProjectionDerivesActiveColor(t *testing.T) {
 	update := time.Date(2026, 1, 2, 3, 0, 0, 0, time.UTC)
 	row := sqlapi.Row{

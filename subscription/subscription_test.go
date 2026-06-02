@@ -59,6 +59,16 @@ func TestTableRequestRequiresBoundedIndex(t *testing.T) {
 	}
 }
 
+func TestRequestRejectsGNFromDifferentDatabase(t *testing.T) {
+	err := Request{
+		DB:  "W3",
+		GNs: []model.GN{"X.N.P1"},
+	}.Validate()
+	if err == nil {
+		t.Fatalf("expected cross-database GN to be rejected")
+	}
+}
+
 func TestSubscribeRequiresConfiguredSource(t *testing.T) {
 	svc := NewService(Options{})
 	stream, err := svc.Subscribe(context.Background(), Request{

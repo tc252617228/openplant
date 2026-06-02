@@ -60,6 +60,34 @@ func TestFindPointsRejectsUnboundedQuery(t *testing.T) {
 	}
 }
 
+func TestMetadataQueriesRejectGNFromDifferentDatabase(t *testing.T) {
+	svc := NewService(Options{Queryer: &fakeQueryer{}})
+	if _, err := svc.FindPoints(context.Background(), PointQuery{
+		DB:  "W3",
+		GNs: []model.GN{"X.N.P1"},
+	}); err == nil {
+		t.Fatalf("expected cross-database point GN to be rejected")
+	}
+	if _, err := svc.ListNodes(context.Background(), NodeQuery{
+		DB:     "W3",
+		Prefix: "X.N",
+	}); err == nil {
+		t.Fatalf("expected cross-database node prefix to be rejected")
+	}
+	if _, err := svc.ListDAS(context.Background(), DASQuery{
+		DB:  "W3",
+		GNs: []model.GN{"X.DAS1"},
+	}); err == nil {
+		t.Fatalf("expected cross-database DAS GN to be rejected")
+	}
+	if _, err := svc.ListDevices(context.Background(), DeviceQuery{
+		DB:     "W3",
+		Prefix: "X.DEV",
+	}); err == nil {
+		t.Fatalf("expected cross-database device prefix to be rejected")
+	}
+}
+
 func TestFindPointConfigsUsesFullPointSQL(t *testing.T) {
 	configTime := time.Unix(100, 0)
 	fake := &fakeQueryer{rows: []sqlapi.Row{{
@@ -319,6 +347,16 @@ func TestListDevicesRejectsUnboundedQuery(t *testing.T) {
 	_, err := svc.ListDevices(context.Background(), DeviceQuery{DB: "W3"})
 	if err == nil {
 		t.Fatalf("expected unbounded device query to be rejected")
+	}
+}
+
+func TestTimeValuePreservesSubMillisecondFloatPrecision(t *testing.T) {
+	got := timeValue(100.0015)
+	if got.Unix() != 100 {
+		t.Fatalf("seconds=%d want 100", got.Unix())
+	}
+	if got.Nanosecond() < 1_499_000 || got.Nanosecond() > 1_501_000 {
+		t.Fatalf("nanosecond=%d want about 1500000", got.Nanosecond())
 	}
 }
 

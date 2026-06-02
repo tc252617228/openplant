@@ -472,20 +472,44 @@ func decodeObjectPayload(blob []byte) (any, error) {
 	case VtNull:
 		return nil, nil
 	case VtBool:
-		return len(blob) > 1 && blob[1] != 0, nil
+		if len(blob) < 2 {
+			return nil, io.ErrUnexpectedEOF
+		}
+		return blob[1] != 0, nil
 	case VtInt8:
+		if len(blob) < 2 {
+			return nil, io.ErrUnexpectedEOF
+		}
 		return int8(blob[1]), nil
 	case VtInt16:
+		if len(blob) < 3 {
+			return nil, io.ErrUnexpectedEOF
+		}
 		return Int16(blob[1:]), nil
 	case VtInt32:
+		if len(blob) < 5 {
+			return nil, io.ErrUnexpectedEOF
+		}
 		return Int32(blob[1:]), nil
 	case VtInt64:
+		if len(blob) < 9 {
+			return nil, io.ErrUnexpectedEOF
+		}
 		return Int64(blob[1:]), nil
 	case VtFloat:
+		if len(blob) < 5 {
+			return nil, io.ErrUnexpectedEOF
+		}
 		return Float32(blob[1:]), nil
 	case VtDouble:
+		if len(blob) < 9 {
+			return nil, io.ErrUnexpectedEOF
+		}
 		return Float64(blob[1:]), nil
 	case VtDateTime:
+		if len(blob) < 9 {
+			return nil, io.ErrUnexpectedEOF
+		}
 		return DateTime(blob[1:]), nil
 	case VtString:
 		return strings.TrimRight(string(blob[1:]), "\x00"), nil

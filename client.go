@@ -7,7 +7,6 @@ import (
 	"github.com/tc252617228/openplant/alarm"
 	"github.com/tc252617228/openplant/archive"
 	"github.com/tc252617228/openplant/internal/cache"
-	"github.com/tc252617228/openplant/internal/codec"
 	"github.com/tc252617228/openplant/internal/transport"
 	"github.com/tc252617228/openplant/metadata"
 	"github.com/tc252617228/openplant/operror"
@@ -41,19 +40,7 @@ func New(opts ...Option) (*Client, error) {
 		return nil, err
 	}
 	c := &Client{options: cfg}
-	c.pool = transport.NewPool(transport.Config{
-		Host:           cfg.Host,
-		Port:           cfg.Port,
-		User:           cfg.User,
-		Password:       cfg.Password,
-		DialTimeout:    cfg.DialTimeout,
-		RequestTimeout: cfg.RequestTimeout,
-		PoolSize:       cfg.PoolSize,
-		MaxIdle:        cfg.MaxIdle,
-		IdleTimeout:    cfg.IdleTimeout,
-		MaxLifetime:    cfg.MaxLifetime,
-		Compression:    codec.CompressionMode(cfg.Compression),
-	})
+	c.pool = transport.NewPool(transportConfigFromOptions(cfg))
 	if !cfg.DisableMetadataCache {
 		c.pointCache = cache.NewPointCacheWithLimit(cfg.MetadataCacheTTL, cfg.MetadataCacheMaxEntries)
 	}

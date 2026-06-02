@@ -72,13 +72,18 @@ func (c *Client) QueryArchiveByRequest(ctx context.Context, q archive.Query) ([]
 	}
 	chunkSize := requestChunkSize(q.ChunkSize, c.options.ChunkSize)
 	out := make([]model.Sample, 0)
+	remaining := q.Limit
+	limitReached := false
 	for _, chunk := range chunkPointIDs(q.IDs, chunkSize) {
+		if limitReached {
+			return out, nil
+		}
 		rows, err := c.selectTableByRequest(ctx, protocol.TableSelectRequest{
 			Table:   string(q.DB) + ".Archive",
 			Columns: []string{"ID", "GN", "TM", "DS", "AV"},
 			Indexes: &protocol.Indexes{Key: "ID", Int32: pointIDsToInt32(chunk)},
 			Filters: timeFilters(q.Range.Begin, q.Range.End),
-			Limit:   limitString(q.Limit),
+			Limit:   remainingLimitString(q.Limit, remaining),
 			Props: map[string]any{
 				"mode":     mode,
 				"interval": interval,
@@ -88,17 +93,18 @@ func (c *Client) QueryArchiveByRequest(ctx context.Context, q archive.Query) ([]
 		if err != nil {
 			return nil, err
 		}
-		for _, row := range rows {
-			out = append(out, sampleFromTableRow(row))
-		}
+		out, limitReached = appendArchiveRows(out, rows, q.Limit, &remaining)
 	}
 	for _, chunk := range chunkGNs(q.GNs, chunkSize) {
+		if limitReached {
+			return out, nil
+		}
 		rows, err := c.selectTableByRequest(ctx, protocol.TableSelectRequest{
 			Table:   string(q.DB) + ".Archive",
 			Columns: []string{"ID", "GN", "TM", "DS", "AV"},
 			Indexes: &protocol.Indexes{Key: "GN", Strings: gnsToStrings(chunk)},
 			Filters: timeFilters(q.Range.Begin, q.Range.End),
-			Limit:   limitString(q.Limit),
+			Limit:   remainingLimitString(q.Limit, remaining),
 			Props: map[string]any{
 				"mode":     mode,
 				"interval": interval,
@@ -108,9 +114,7 @@ func (c *Client) QueryArchiveByRequest(ctx context.Context, q archive.Query) ([]
 		if err != nil {
 			return nil, err
 		}
-		for _, row := range rows {
-			out = append(out, sampleFromTableRow(row))
-		}
+		out, limitReached = appendArchiveRows(out, rows, q.Limit, &remaining)
 	}
 	return out, nil
 }
@@ -128,13 +132,18 @@ func (c *Client) QueryStatByRequest(ctx context.Context, q stat.Query) ([]model.
 	}
 	chunkSize := requestChunkSize(q.ChunkSize, c.options.ChunkSize)
 	out := make([]model.StatSample, 0)
+	remaining := q.Limit
+	limitReached := false
 	for _, chunk := range chunkPointIDs(q.IDs, chunkSize) {
+		if limitReached {
+			return out, nil
+		}
 		rows, err := c.selectTableByRequest(ctx, protocol.TableSelectRequest{
 			Table:   string(q.DB) + ".Stat",
 			Columns: []string{"ID", "GN", "TM", "DS", "FLOW", "AVGV", "MAXV", "MINV", "MAXTIME", "MINTIME"},
 			Indexes: &protocol.Indexes{Key: "ID", Int32: pointIDsToInt32(chunk)},
 			Filters: timeFilters(q.Range.Begin, q.Range.End),
-			Limit:   limitString(q.Limit),
+			Limit:   remainingLimitString(q.Limit, remaining),
 			Props: map[string]any{
 				"interval": interval,
 				"qtype":    int32(q.Quality),
@@ -143,17 +152,18 @@ func (c *Client) QueryStatByRequest(ctx context.Context, q stat.Query) ([]model.
 		if err != nil {
 			return nil, err
 		}
-		for _, row := range rows {
-			out = append(out, statSampleFromTableRow(row))
-		}
+		out, limitReached = appendStatRows(out, rows, q.Limit, &remaining)
 	}
 	for _, chunk := range chunkGNs(q.GNs, chunkSize) {
+		if limitReached {
+			return out, nil
+		}
 		rows, err := c.selectTableByRequest(ctx, protocol.TableSelectRequest{
 			Table:   string(q.DB) + ".Stat",
 			Columns: []string{"ID", "GN", "TM", "DS", "FLOW", "AVGV", "MAXV", "MINV", "MAXTIME", "MINTIME"},
 			Indexes: &protocol.Indexes{Key: "GN", Strings: gnsToStrings(chunk)},
 			Filters: timeFilters(q.Range.Begin, q.Range.End),
-			Limit:   limitString(q.Limit),
+			Limit:   remainingLimitString(q.Limit, remaining),
 			Props: map[string]any{
 				"interval": interval,
 				"qtype":    int32(q.Quality),
@@ -162,9 +172,7 @@ func (c *Client) QueryStatByRequest(ctx context.Context, q stat.Query) ([]model.
 		if err != nil {
 			return nil, err
 		}
-		for _, row := range rows {
-			out = append(out, statSampleFromTableRow(row))
-		}
+		out, limitReached = appendStatRows(out, rows, q.Limit, &remaining)
 	}
 	return out, nil
 }
@@ -342,11 +350,43 @@ func uniqueGNsForRequest(gns []model.GN) []model.GN {
 	return out
 }
 
-func limitString(limit int) string {
+func remainingLimitString(limit, remaining int) string {
 	if limit <= 0 {
 		return ""
 	}
-	return strconv.Itoa(limit)
+	return strconv.Itoa(remaining)
+}
+
+func appendArchiveRows(out []model.Sample, rows []sql.Row, limit int, remaining *int) ([]model.Sample, bool) {
+	for _, row := range rows {
+		if limit > 0 {
+			if *remaining <= 0 {
+				return out, true
+			}
+			*remaining--
+		}
+		out = append(out, sampleFromTableRow(row))
+		if limit > 0 && *remaining == 0 {
+			return out, true
+		}
+	}
+	return out, false
+}
+
+func appendStatRows(out []model.StatSample, rows []sql.Row, limit int, remaining *int) ([]model.StatSample, bool) {
+	for _, row := range rows {
+		if limit > 0 {
+			if *remaining <= 0 {
+				return out, true
+			}
+			*remaining--
+		}
+		out = append(out, statSampleFromTableRow(row))
+		if limit > 0 && *remaining == 0 {
+			return out, true
+		}
+	}
+	return out, false
 }
 
 func sampleFromTableRow(row sql.Row) model.Sample {

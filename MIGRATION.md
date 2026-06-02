@@ -25,6 +25,13 @@ Default APIs do not perform hidden fallback.
 This is intentional. The SDK must not hide extra database calls, retries, or
 transport changes behind ordinary methods.
 
+Legacy clients often enabled transport compression after connecting. In
+`openplant`, transport compression is an explicit client option and defaults to
+off. `WithCompression(CompressionFrame)` and `WithCompression(CompressionBlock)`
+apply only after the login handshake; login frames and heartbeat probes remain
+uncompressed. Requested business-frame compression is strict and returns errors
+instead of falling back to uncompressed frames.
+
 ## Client Setup
 
 Legacy code usually created a broad client and let methods choose paths

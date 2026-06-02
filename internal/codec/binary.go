@@ -26,7 +26,8 @@ func Float32(src []byte) float32 { return math.Float32frombits(binary.BigEndian.
 func Float64(src []byte) float64 { return math.Float64frombits(binary.BigEndian.Uint64(src)) }
 
 func PutDateTime(dst []byte, v time.Time) {
-	PutFloat64(dst, float64(v.UnixNano()/1e6)/1e3)
+	seconds := float64(v.Unix()) + float64(v.Nanosecond())/1e9
+	PutFloat64(dst, seconds)
 }
 
 func AppendInt16(dst []byte, v int16) []byte {
@@ -50,7 +51,7 @@ func AppendFloat64(dst []byte, v float64) []byte {
 func DateTime(src []byte) time.Time {
 	seconds := Float64(src)
 	sec := int64(seconds)
-	nsec := int64(seconds*1e3) % 1000 * 1e6
+	nsec := int64((seconds - float64(sec)) * 1e9)
 	return time.Unix(sec, nsec)
 }
 

@@ -119,6 +119,16 @@ func TestSubscribeAlarmRecordsMapsRows(t *testing.T) {
 	}
 }
 
+func TestTimeValuePreservesSubMillisecondFloatPrecision(t *testing.T) {
+	got := timeValue(100.0015)
+	if got.Unix() != 100 {
+		t.Fatalf("seconds=%d want 100", got.Unix())
+	}
+	if got.Nanosecond() < 1_499_000 || got.Nanosecond() > 1_501_000 {
+		t.Fatalf("nanosecond=%d want about 1500000", got.Nanosecond())
+	}
+}
+
 func receiveTypedEvent[T any](t testing.TB, ch <-chan TypedTableEvent[T]) TypedTableEvent[T] {
 	t.Helper()
 	return receiveTypedEventWithin(t, ch, time.Second)

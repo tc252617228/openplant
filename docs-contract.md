@@ -508,6 +508,28 @@ timeouts, integration tests, and admin surfaces:
 must never persist these credentials and should only expose safe readonly
 inspection unless mutation is explicitly enabled.
 
+### Transport Frame Compression
+
+The V5 TCP frame header carries a two-bit compression mode in `head[1] & 3`.
+The SDK default is `0 = uncompressed`; caller-selected compression is a
+connection option, not a query-path fallback. The login handshake and heartbeat
+probe stay uncompressed. After login, business frames use the configured
+compression mode:
+
+- `0 = none`
+- `1 = LZ4 frame` with OpenPlant's documented legacy frame bytes and XXH32
+  content checksum
+- `2 = LZ4 block`
+
+Compression is strict. If a requested compressed business frame cannot be
+encoded, does not become smaller than the original payload, or cannot be
+decoded on receipt, the SDK returns the error transparently. It does not retry,
+downgrade to uncompressed, or switch SQL/request/native paths.
+
+The low-level `Conn.CompressionMode()` API reports the configured outbound
+business-frame mode after login. It is not a server negotiation result; inbound
+frames are decoded from each frame's wire compression flag.
+
 ## DS Status Word
 
 Dynamic realtime and history values include `TM`, `DS`, and `AV`. `DS` is a
@@ -689,6 +711,9 @@ SDK policy:
   behind the caller's back.
 - Request/select SDK methods may use ID or GN indexes, but they must stay on
   the request/select path and return server unsupported errors transparently.
+- Public requests that carry both `DB` and GN selectors validate that each GN is
+  database-qualified for that same DB. Cross-database GNs fail validation before
+  any network I/O.
 - OpenPlant V5 accepts database-qualified table names in the form
   `W3.Point`. A real V5 target returned `-116 resource not available` for the
   SQLite-style split-quoted form `"W3"."Point"`, so SDK SQL builders validate

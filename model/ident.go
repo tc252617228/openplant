@@ -40,6 +40,21 @@ func (s PointSelector) ValidateBounded() error {
 	return nil
 }
 
+func (s PointSelector) ValidateBoundedInDatabase(db DatabaseName) error {
+	if err := db.Validate(); err != nil {
+		return err
+	}
+	if err := s.ValidateBounded(); err != nil {
+		return err
+	}
+	for _, gn := range s.GNs {
+		if err := gn.ValidateInDatabase(db); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (db DatabaseName) Validate() error {
 	if db == "" {
 		return fmt.Errorf("database name is required")
@@ -55,6 +70,20 @@ func (gn GN) Validate() error {
 		if unicode.IsControl(r) {
 			return fmt.Errorf("GN contains control character")
 		}
+	}
+	return nil
+}
+
+func (gn GN) ValidateInDatabase(db DatabaseName) error {
+	if err := db.Validate(); err != nil {
+		return err
+	}
+	if err := gn.Validate(); err != nil {
+		return err
+	}
+	got := gn.Database()
+	if got != db {
+		return fmt.Errorf("GN %q belongs to database %q, not %q", gn, got, db)
 	}
 	return nil
 }

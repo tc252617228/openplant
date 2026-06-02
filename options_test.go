@@ -38,3 +38,30 @@ func TestMetadataCacheMaxEntriesRequiresPositiveLimitUnlessDisabled(t *testing.T
 		t.Fatalf("disabled metadata cache should allow zero max entries: %v", err)
 	}
 }
+
+func TestCompressionOptionValidation(t *testing.T) {
+	if DefaultOptions().Compression != CompressionNone {
+		t.Fatalf("default compression=%d want none", DefaultOptions().Compression)
+	}
+	for _, mode := range []CompressionMode{
+		CompressionNone,
+		CompressionFrame,
+		CompressionBlock,
+	} {
+		if _, err := New(WithCompression(mode)); err != nil {
+			t.Fatalf("compression mode %d rejected: %v", mode, err)
+		}
+	}
+	if _, err := New(WithCompression(CompressionMode(99))); err == nil {
+		t.Fatalf("expected invalid compression mode to be rejected")
+	}
+}
+
+func TestOptionsFromEnvRejectsInvalidPort(t *testing.T) {
+	t.Setenv("OPENPLANT_BAD_PORT_HOST", "127.0.0.1")
+	t.Setenv("OPENPLANT_BAD_PORT_PORT", "not-a-port")
+
+	if _, err := newOptions(OptionsFromEnv("OPENPLANT_BAD_PORT")...); err == nil {
+		t.Fatalf("expected invalid environment port to be rejected")
+	}
+}

@@ -80,11 +80,30 @@ callers that want orchestration must build it above the SDK with visible
 policy, tracing, and cost control. `examples/strategy` shows that pattern
 without adding it to the base SDK.
 
+Transport compression is also explicit. The SDK default is
+`CompressionNone`; callers can opt in with `WithCompression(CompressionFrame)`
+or `WithCompression(CompressionBlock)`. Login and heartbeat probes stay on the
+documented uncompressed wire shape. Requested business-frame compression is
+strict: compression or decompression errors, unsupported frame modes, and
+compressed frames that are not smaller than the original payload are returned as
+errors. The SDK does not retry, downgrade, or switch SQL/request/native paths
+behind the caller's back.
+
+For protocol-level checks, `Dial` returns a narrow low-level `Conn` with
+`Ping`, `Close`, and `CompressionMode`. `CompressionMode` reports the outbound
+business-frame mode configured after login; server response frames carry their
+own wire mode and are decoded independently. Application code should still
+prefer `New` and the typed service facades.
+
 Native paths require point IDs. If callers want to use GNs, they should resolve
 them explicitly through `Metadata()` or use a SQL/request path that natively
 accepts GN selectors. The SDK does not do hidden metadata SQL inside native
 APIs, and native realtime results do not populate `Sample.GN` from the metadata
 cache.
+
+Requests that include both a `DB` and GN selectors require the GN to belong to
+that same database, for example `DB: "W3"` with `GN: "W3.N.P1"`. Cross-database
+GNs are rejected during validation before network I/O.
 
 `SQL().Query` is intentionally conservative: it accepts only `SELECT` and
 readonly `WITH ... SELECT` statements. Use `SQL().ExecUnsafe` with explicit

@@ -98,6 +98,32 @@ func TestQueryRequestAllowsGNWithoutNativeReader(t *testing.T) {
 	}
 }
 
+func TestReadRequestRejectsGNFromDifferentDatabase(t *testing.T) {
+	err := ReadRequest{
+		DB:  "W3",
+		GNs: []model.GN{"X.N.P1"},
+	}.Validate()
+	if err == nil {
+		t.Fatalf("expected cross-database GN to be rejected")
+	}
+}
+
+func TestWriteRequestRejectsGNFromDifferentDatabase(t *testing.T) {
+	err := WriteRequest{
+		DB: "W3",
+		Values: []Write{{
+			GN:     "X.N.P1",
+			Type:   model.TypeR8,
+			Time:   time.Now(),
+			Status: 0,
+			Value:  model.R8(1),
+		}},
+	}.Validate()
+	if err == nil {
+		t.Fatalf("expected cross-database write GN to be rejected")
+	}
+}
+
 func TestReadRejectsGNBeforeNativeReader(t *testing.T) {
 	reader := &fakeReader{}
 	svc := NewService(Options{Reader: reader})

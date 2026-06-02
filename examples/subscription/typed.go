@@ -418,7 +418,7 @@ func timeValue(v any) time.Time {
 		return time.Unix(x, 0)
 	case float64:
 		sec := int64(x)
-		nsec := int64(x*1e3) % 1000 * 1e6
+		nsec := int64((x - float64(sec)) * 1e9)
 		return time.Unix(sec, nsec)
 	default:
 		return time.Time{}

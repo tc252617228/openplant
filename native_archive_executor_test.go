@@ -239,6 +239,39 @@ func TestArchiveQueryNativeTimeoutDropsConnection(t *testing.T) {
 	}
 }
 
+func TestArchiveQueryNativeDecodeErrorDropsConnection(t *testing.T) {
+	client := newPipeNativeArchiveClient(t, func(t *testing.T, conn net.Conn) {
+		serveNativeArchiveMalformedValue(t, conn)
+	})
+	defer client.Close()
+
+	begin := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
+	_, err := client.Archive().QueryNative(context.Background(), archive.Query{
+		DB:    "W3",
+		IDs:   []model.PointID{1001},
+		Range: model.TimeRange{Begin: begin, End: begin.Add(time.Hour)},
+		Mode:  model.ModeRaw,
+	})
+	if err == nil || !operror.IsKind(err, operror.KindDecode) {
+		t.Fatalf("expected decode error, got %v", err)
+	}
+	if stats := client.pool.Stats(); stats.Open != 0 || stats.Idle != 0 {
+		t.Fatalf("stats=%#v want decode-failed stream connection dropped", stats)
+	}
+}
+
+func TestReadNativeArchiveSamplePropagatesTruncatedValue(t *testing.T) {
+	var raw bytes.Buffer
+	writer := codec.NewWriter(&raw)
+	_ = writer.WriteInt32(123456)
+	_ = writer.WriteInt16(0)
+
+	_, err := readNativeArchiveSample(codec.NewReader(&raw), 1001, "", model.TypeR8)
+	if err == nil || !operror.IsKind(err, operror.KindDecode) {
+		t.Fatalf("expected decode error for truncated native archive value, got %v", err)
+	}
+}
+
 func newPipeNativeArchiveClient(t *testing.T, serve func(*testing.T, net.Conn)) *Client {
 	t.Helper()
 	cfg := DefaultOptions()
@@ -338,6 +371,15 @@ func serveNativeArchiveServerError(t *testing.T, conn net.Conn) {
 		return
 	}
 	writeNativeServerErrorResponse(t, writer, -113)
+}
+
+func serveNativeArchiveMalformedValue(t *testing.T, conn net.Conn) {
+	defer conn.Close()
+	writer, reader := handshakeNativeServer(t, conn)
+	if _, ok := readNativeArchiveWireRequest(t, reader); !ok {
+		return
+	}
+	writeNativeArchiveMalformedValueResponse(t, writer)
 }
 
 func serveNativeArchiveWithoutResponse(t *testing.T, conn net.Conn, requestRead chan<- struct{}) {
@@ -525,5 +567,23 @@ func writeNativeServerErrorResponse(t *testing.T, writer *codec.FrameWriter, cod
 	_ = resp.WriteInt32(protocol.Magic)
 	if err := writer.WriteMessage(response.Bytes()); err != nil && err != io.ErrClosedPipe {
 		t.Errorf("write native server error response: %v", err)
+	}
+}
+
+func writeNativeArchiveMalformedValueResponse(t *testing.T, writer *codec.FrameWriter) {
+	t.Helper()
+	var response bytes.Buffer
+	resp := codec.NewWriter(&response)
+	_ = resp.WriteInt32(protocol.Magic)
+	_ = resp.WriteInt32(0)
+	_ = resp.WriteInt32(1)
+	_ = resp.WriteInt8(1)
+	_ = resp.WriteInt32(0)
+	_ = resp.WriteInt8(int8(model.TypeR8))
+	_ = resp.WriteInt32(1)
+	_ = resp.WriteInt32(123456)
+	_ = resp.WriteInt16(0)
+	if err := writer.WriteMessage(response.Bytes()); err != nil && err != io.ErrClosedPipe {
+		t.Errorf("write malformed native archive response: %v", err)
 	}
 }

@@ -62,13 +62,21 @@ func (p *Pool) Acquire(ctx context.Context) (*Conn, error) {
 			cfg := p.cfg
 			p.mu.Unlock()
 			conn, err := Dial(ctx, cfg)
+			now := p.now()
+			p.mu.Lock()
 			if err != nil {
-				p.mu.Lock()
 				p.open--
 				p.mu.Unlock()
 				return nil, err
 			}
-			p.track(conn)
+			if p.closed {
+				p.open--
+				p.mu.Unlock()
+				_ = conn.Close()
+				return nil, operror.ErrClosed
+			}
+			p.meta[conn] = connMeta{createdAt: now, lastUsed: now}
+			p.mu.Unlock()
 			return conn, nil
 		}
 		idle := p.idle

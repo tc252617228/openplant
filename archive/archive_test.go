@@ -138,6 +138,45 @@ func TestArchiveQueryIncludesIntervalForIntervalModes(t *testing.T) {
 	}
 }
 
+func TestArchiveRequestsRejectGNFromDifferentDatabase(t *testing.T) {
+	begin := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
+	end := begin.Add(time.Hour)
+	if err := (Query{
+		DB:    "W3",
+		GNs:   []model.GN{"X.N.P1"},
+		Range: model.TimeRange{Begin: begin, End: end},
+		Mode:  model.ModeRaw,
+	}).Validate(); err == nil {
+		t.Fatalf("expected cross-database query GN to be rejected")
+	}
+	if err := (SnapshotQuery{
+		DB:       "W3",
+		GNs:      []model.GN{"X.N.P1"},
+		Range:    model.TimeRange{Begin: begin, End: end},
+		Interval: "1m",
+	}).Validate(); err == nil {
+		t.Fatalf("expected cross-database snapshot GN to be rejected")
+	}
+	if err := (DeleteRequest{
+		DB:    "W3",
+		GNs:   []model.GN{"X.N.P1"},
+		Range: model.TimeRange{Begin: begin, End: end},
+	}).Validate(); err == nil {
+		t.Fatalf("expected cross-database delete GN to be rejected")
+	}
+	if err := (WriteRequest{
+		DB: "W3",
+		Samples: []model.Sample{{
+			GN:    "X.N.P1",
+			Type:  model.TypeR8,
+			Time:  begin,
+			Value: model.R8(1),
+		}},
+	}).Validate(); err == nil {
+		t.Fatalf("expected cross-database write GN to be rejected")
+	}
+}
+
 func TestArchiveSnapshotSQLUsesOPConsoleProjection(t *testing.T) {
 	begin := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
 	end := begin.Add(time.Hour)

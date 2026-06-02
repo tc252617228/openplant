@@ -17,6 +17,28 @@ const (
 	CompressionBlock
 )
 
+func (m CompressionMode) Valid() bool {
+	switch m {
+	case CompressionNone, CompressionFrame, CompressionBlock:
+		return true
+	default:
+		return false
+	}
+}
+
+func (m CompressionMode) String() string {
+	switch m {
+	case CompressionNone:
+		return "none"
+	case CompressionFrame:
+		return "frame"
+	case CompressionBlock:
+		return "block"
+	default:
+		return "unknown"
+	}
+}
+
 type Options struct {
 	Host                    string
 	Port                    int
@@ -91,6 +113,9 @@ func (o Options) Validate() error {
 	}
 	if o.MaxLifetime <= 0 {
 		return fmt.Errorf("%w: max lifetime must be positive", operror.ErrInvalidOption)
+	}
+	if !o.Compression.Valid() {
+		return fmt.Errorf("%w: compression mode must be none, frame, or block", operror.ErrInvalidOption)
 	}
 	if o.ChunkSize <= 0 {
 		return fmt.Errorf("%w: chunk size must be positive", operror.ErrInvalidOption)
@@ -199,6 +224,8 @@ func OptionsFromEnv(prefix string) []Option {
 		if portRaw != "" {
 			if parsed, err := strconv.Atoi(portRaw); err == nil {
 				port = parsed
+			} else {
+				port = 0
 			}
 		}
 		opts = append(opts, WithEndpoint(host, port))

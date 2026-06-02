@@ -31,7 +31,7 @@ func (r Request) Validate() error {
 	if err := r.DB.Validate(); err != nil {
 		return err
 	}
-	return (model.PointSelector{IDs: r.IDs, GNs: r.GNs}).ValidateBounded()
+	return (model.PointSelector{IDs: r.IDs, GNs: r.GNs}).ValidateBoundedInDatabase(r.DB)
 }
 
 type TableRequest struct {

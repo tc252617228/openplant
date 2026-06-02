@@ -370,7 +370,7 @@ func readNativeArchiveSample(r *codec.Reader, id model.PointID, gn model.GN, typ
 		return model.Sample{}, operror.Wrap(operror.KindDecode, "openplant.nativeArchive.sample.status", err)
 	}
 	value, err := codec.DecodeTSValue(r, typ)
-	if err != nil && err != io.EOF {
+	if err != nil {
 		return model.Sample{}, operror.Wrap(operror.KindDecode, "openplant.nativeArchive.sample.value", err)
 	}
 	return model.Sample{

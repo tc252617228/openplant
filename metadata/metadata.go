@@ -74,12 +74,12 @@ func (q PointQuery) Validate() error {
 		return operror.Validation("metadata.PointQuery.Validate", "unbounded point metadata query requires a positive limit")
 	}
 	if len(q.IDs) > 0 || len(q.GNs) > 0 {
-		if err := (model.PointSelector{IDs: q.IDs, GNs: q.GNs}).ValidateBounded(); err != nil {
+		if err := (model.PointSelector{IDs: q.IDs, GNs: q.GNs}).ValidateBoundedInDatabase(q.DB); err != nil {
 			return err
 		}
 	}
 	if q.Prefix != "" {
-		if err := q.Prefix.Validate(); err != nil {
+		if err := q.Prefix.ValidateInDatabase(q.DB); err != nil {
 			return err
 		}
 	}
@@ -107,12 +107,12 @@ func (q NodeQuery) Validate() error {
 		}
 	}
 	for _, gn := range q.GNs {
-		if err := gn.Validate(); err != nil {
+		if err := gn.ValidateInDatabase(q.DB); err != nil {
 			return err
 		}
 	}
 	if q.Prefix != "" {
-		if err := q.Prefix.Validate(); err != nil {
+		if err := q.Prefix.ValidateInDatabase(q.DB); err != nil {
 			return err
 		}
 	}
@@ -134,7 +134,7 @@ func (q DASQuery) Validate() error {
 			return operror.Validation("metadata.DASQuery.Validate", fmt.Sprintf("DAS ID cannot be negative: %d", id))
 		}
 	}
-	if err := validateGNScope(q.GNs, q.Prefix); err != nil {
+	if err := validateGNScope(q.DB, q.GNs, q.Prefix); err != nil {
 		return err
 	}
 	if q.Limit < 0 {
@@ -155,7 +155,7 @@ func (q DeviceQuery) Validate() error {
 			return operror.Validation("metadata.DeviceQuery.Validate", fmt.Sprintf("device ID cannot be negative: %d", id))
 		}
 	}
-	if err := validateGNScope(q.GNs, q.Prefix); err != nil {
+	if err := validateGNScope(q.DB, q.GNs, q.Prefix); err != nil {
 		return err
 	}
 	if q.Limit < 0 {
@@ -920,14 +920,14 @@ func appendGNConditions(conditions *[]string, gns []model.GN, prefix model.GN) {
 	}
 }
 
-func validateGNScope(gns []model.GN, prefix model.GN) error {
+func validateGNScope(db model.DatabaseName, gns []model.GN, prefix model.GN) error {
 	for _, gn := range gns {
-		if err := gn.Validate(); err != nil {
+		if err := gn.ValidateInDatabase(db); err != nil {
 			return err
 		}
 	}
 	if prefix != "" {
-		if err := prefix.Validate(); err != nil {
+		if err := prefix.ValidateInDatabase(db); err != nil {
 			return err
 		}
 	}
@@ -1298,7 +1298,7 @@ func timeValue(v any) time.Time {
 		return time.Unix(x, 0)
 	case float64:
 		sec := int64(x)
-		nsec := int64(x*1e3) % 1000 * 1e6
+		nsec := int64((x - float64(sec)) * 1e9)
 		return time.Unix(sec, nsec)
 	default:
 		return time.Time{}

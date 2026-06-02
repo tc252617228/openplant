@@ -72,6 +72,49 @@ func TestArchiveQueryRequestUsesGNIndexWithoutMetadataResolution(t *testing.T) {
 	}
 }
 
+func TestArchiveQueryRequestLimitIsGlobalAcrossChunks(t *testing.T) {
+	client := newPipeArchiveRequestClientWithServer(t, serveArchiveLimitRequests)
+	defer client.Close()
+
+	begin := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
+	samples, err := client.Archive().QueryRequest(context.Background(), archive.Query{
+		DB:        "W3",
+		IDs:       []model.PointID{1001, 1002},
+		Range:     model.TimeRange{Begin: begin, End: begin.Add(time.Hour)},
+		Mode:      model.ModeRaw,
+		Limit:     3,
+		ChunkSize: 1,
+	})
+	if err != nil {
+		t.Fatalf("Archive query failed: %v", err)
+	}
+	if len(samples) != 3 {
+		t.Fatalf("samples=%d want global limit 3: %#v", len(samples), samples)
+	}
+}
+
+func TestStatQueryRequestLimitIsGlobalAcrossChunks(t *testing.T) {
+	client := newPipeStatRequestClientWithServer(t, serveStatLimitRequests)
+	defer client.Close()
+
+	begin := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
+	samples, err := client.Stat().QueryRequest(context.Background(), stat.Query{
+		DB:        "W3",
+		IDs:       []model.PointID{1001, 1002},
+		Range:     model.TimeRange{Begin: begin, End: begin.Add(time.Hour)},
+		Mode:      model.ModeAvg,
+		Interval:  "1m",
+		Limit:     3,
+		ChunkSize: 1,
+	})
+	if err != nil {
+		t.Fatalf("Stat query failed: %v", err)
+	}
+	if len(samples) != 3 {
+		t.Fatalf("samples=%d want global limit 3: %#v", len(samples), samples)
+	}
+}
+
 func TestRealtimeQueryRequestUsesGNIndex(t *testing.T) {
 	client := newPipeRealtimeRequestClient(t, serveRealtimeGNRequest)
 	defer client.Close()
@@ -165,6 +208,32 @@ func newPipeRealtimeRequestClient(t *testing.T, serve func(*testing.T, net.Conn)
 	return c
 }
 
+func newPipeStatRequestClientWithServer(t *testing.T, serve func(*testing.T, net.Conn)) *Client {
+	t.Helper()
+	cfg := DefaultOptions()
+	cfg.RequestTimeout = time.Second
+	c := &Client{options: cfg}
+	c.pool = transport.NewPool(transport.Config{
+		Host:           "pipe",
+		Port:           1,
+		User:           "test-user",
+		Password:       "test-secret",
+		DialTimeout:    time.Second,
+		RequestTimeout: time.Second,
+		PoolSize:       1,
+		MaxIdle:        1,
+		IdleTimeout:    time.Minute,
+		MaxLifetime:    time.Minute,
+		DialContext: func(ctx context.Context, network, address string) (net.Conn, error) {
+			client, server := net.Pipe()
+			go serve(t, server)
+			return client, nil
+		},
+	})
+	c.stat = stat.NewService(stat.Options{Requester: c})
+	return c
+}
+
 func serveArchiveRequest(t *testing.T, conn net.Conn) {
 	defer conn.Close()
 	writer := codec.NewFrameWriter(conn, codec.CompressionNone)
@@ -230,6 +299,54 @@ func serveArchiveRequest(t *testing.T, conn net.Conn) {
 	}
 
 	writeArchiveRequestResponse(t, writer)
+}
+
+func serveArchiveLimitRequests(t *testing.T, conn net.Conn) {
+	defer conn.Close()
+	writer := codec.NewFrameWriter(conn, codec.CompressionNone)
+	reader := codec.NewFrameReader(conn)
+	writeLoginChallenge(t, writer)
+	readLoginReply(t, reader)
+	writeLoginOK(t, writer)
+
+	for i, wantLimit := range []string{"3", "1"} {
+		props, ok := readRequestProps(t, reader)
+		if !ok {
+			return
+		}
+		if props[protocol.PropTable] != "W3.Archive" || props[protocol.PropLimit] != wantLimit {
+			t.Errorf("request %d unexpected table/limit: %#v", i, props)
+			return
+		}
+		writeArchiveRequestRowsResponse(t, writer, []map[string]any{
+			{"ID": int32(1000 + i), "GN": "W3.N.P1", "TM": time.Unix(123456+int64(i*10), 0), "DS": int16(0), "AV": float64(12.5)},
+			{"ID": int32(2000 + i), "GN": "W3.N.P2", "TM": time.Unix(123457+int64(i*10), 0), "DS": int16(0), "AV": float64(13.5)},
+		})
+	}
+}
+
+func serveStatLimitRequests(t *testing.T, conn net.Conn) {
+	defer conn.Close()
+	writer := codec.NewFrameWriter(conn, codec.CompressionNone)
+	reader := codec.NewFrameReader(conn)
+	writeLoginChallenge(t, writer)
+	readLoginReply(t, reader)
+	writeLoginOK(t, writer)
+
+	for i, wantLimit := range []string{"3", "1"} {
+		props, ok := readRequestProps(t, reader)
+		if !ok {
+			return
+		}
+		if props[protocol.PropTable] != "W3.Stat" || props[protocol.PropLimit] != wantLimit {
+			t.Errorf("request %d unexpected table/limit: %#v", i, props)
+			return
+		}
+		writeStatRequestRowsResponse(t, writer, []map[string]any{
+			{"ID": int32(1000 + i), "GN": "W3.N.P1", "TM": time.Unix(123456+int64(i*10), 0), "DS": int16(0), "FLOW": float64(1), "AVGV": float64(2), "MAXV": float64(3), "MINV": float64(4), "MAXTIME": time.Unix(123456, 0), "MINTIME": time.Unix(123456, 0)},
+			{"ID": int32(2000 + i), "GN": "W3.N.P2", "TM": time.Unix(123457+int64(i*10), 0), "DS": int16(0), "FLOW": float64(5), "AVGV": float64(6), "MAXV": float64(7), "MINV": float64(8), "MAXTIME": time.Unix(123457, 0), "MINTIME": time.Unix(123457, 0)},
+		})
+	}
 }
 
 func serveArchiveGNRequest(t *testing.T, conn net.Conn) {
@@ -332,6 +449,27 @@ func serveRealtimeGNRequest(t *testing.T, conn net.Conn) {
 	writeArchiveRequestResponse(t, writer)
 }
 
+func readRequestProps(t *testing.T, reader *codec.FrameReader) (map[string]any, bool) {
+	t.Helper()
+	payload, err := reader.ReadMessage()
+	if err != nil {
+		t.Errorf("read request: %v", err)
+		return nil, false
+	}
+	reader.ResetMessage()
+	value, err := codec.NewDecoder(bytes.NewReader(payload)).DecodeValue()
+	if err != nil {
+		t.Errorf("decode request props: %v", err)
+		return nil, false
+	}
+	props, ok := value.(map[string]any)
+	if !ok {
+		t.Errorf("request props are %T", value)
+		return nil, false
+	}
+	return props, true
+}
+
 func writeArchiveRequestResponse(t *testing.T, writer *codec.FrameWriter) {
 	t.Helper()
 	columns := []codec.Column{
@@ -341,13 +479,45 @@ func writeArchiveRequestResponse(t *testing.T, writer *codec.FrameWriter) {
 		{Name: "DS", Type: codec.VtInt16},
 		{Name: "AV", Type: codec.VtObject},
 	}
-	body, err := codec.EncodeDataSet(columns, []map[string]any{{
+	writeRowsResponse(t, writer, columns, []map[string]any{{
 		"ID": int32(1001),
 		"GN": "W3.N.P1",
 		"TM": time.Unix(123456, 0),
 		"DS": int16(0),
 		"AV": float64(12.5),
 	}})
+}
+
+func writeArchiveRequestRowsResponse(t *testing.T, writer *codec.FrameWriter, rows []map[string]any) {
+	t.Helper()
+	writeRowsResponse(t, writer, []codec.Column{
+		{Name: "ID", Type: codec.VtInt32},
+		{Name: "GN", Type: codec.VtString},
+		{Name: "TM", Type: codec.VtDateTime},
+		{Name: "DS", Type: codec.VtInt16},
+		{Name: "AV", Type: codec.VtObject},
+	}, rows)
+}
+
+func writeStatRequestRowsResponse(t *testing.T, writer *codec.FrameWriter, rows []map[string]any) {
+	t.Helper()
+	writeRowsResponse(t, writer, []codec.Column{
+		{Name: "ID", Type: codec.VtInt32},
+		{Name: "GN", Type: codec.VtString},
+		{Name: "TM", Type: codec.VtDateTime},
+		{Name: "DS", Type: codec.VtInt16},
+		{Name: "FLOW", Type: codec.VtDouble},
+		{Name: "AVGV", Type: codec.VtDouble},
+		{Name: "MAXV", Type: codec.VtDouble},
+		{Name: "MINV", Type: codec.VtDouble},
+		{Name: "MAXTIME", Type: codec.VtDateTime},
+		{Name: "MINTIME", Type: codec.VtDateTime},
+	}, rows)
+}
+
+func writeRowsResponse(t *testing.T, writer *codec.FrameWriter, columns []codec.Column, rows []map[string]any) {
+	t.Helper()
+	body, err := codec.EncodeDataSet(columns, rows)
 	if err != nil {
 		t.Errorf("encode dataset: %v", err)
 		return

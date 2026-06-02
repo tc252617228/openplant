@@ -52,7 +52,7 @@ func (r WriteRequest) Validate() error {
 			return operror.Validation("archive.WriteRequest.Validate", "sample requires ID or GN")
 		}
 		if sample.GN != "" {
-			if err := sample.GN.Validate(); err != nil {
+			if err := sample.GN.ValidateInDatabase(r.DB); err != nil {
 				return err
 			}
 		}
@@ -96,7 +96,7 @@ func (r DeleteRequest) Validate() error {
 	if err := r.DB.Validate(); err != nil {
 		return err
 	}
-	if err := (model.PointSelector{IDs: r.IDs, GNs: r.GNs}).ValidateBounded(); err != nil {
+	if err := (model.PointSelector{IDs: r.IDs, GNs: r.GNs}).ValidateBoundedInDatabase(r.DB); err != nil {
 		return err
 	}
 	if err := r.Range.Validate(); err != nil {
@@ -152,7 +152,7 @@ func (q Query) Validate() error {
 	if err := q.DB.Validate(); err != nil {
 		return err
 	}
-	if err := (model.PointSelector{IDs: q.IDs, GNs: q.GNs}).ValidateBounded(); err != nil {
+	if err := (model.PointSelector{IDs: q.IDs, GNs: q.GNs}).ValidateBoundedInDatabase(q.DB); err != nil {
 		return err
 	}
 	if err := q.Range.Validate(); err != nil {
@@ -198,7 +198,7 @@ func (q SnapshotQuery) Validate() error {
 	if err := q.DB.Validate(); err != nil {
 		return err
 	}
-	if err := (model.PointSelector{IDs: q.IDs, GNs: q.GNs}).ValidateBounded(); err != nil {
+	if err := (model.PointSelector{IDs: q.IDs, GNs: q.GNs}).ValidateBoundedInDatabase(q.DB); err != nil {
 		return err
 	}
 	if err := q.Range.Validate(); err != nil {

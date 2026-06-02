@@ -34,7 +34,7 @@ func (q HistoryQuery) Validate() error {
 	if err := q.DB.Validate(); err != nil {
 		return err
 	}
-	if err := (model.PointSelector{IDs: q.IDs, GNs: q.GNs}).ValidateBounded(); err != nil {
+	if err := (model.PointSelector{IDs: q.IDs, GNs: q.GNs}).ValidateBoundedInDatabase(q.DB); err != nil {
 		return err
 	}
 	if err := q.Range.Validate(); err != nil {
