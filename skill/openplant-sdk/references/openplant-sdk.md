@@ -11,6 +11,8 @@ default methods:
   `Stat().StreamNative`: native only.
 - Native base APIs require point IDs. They must not resolve GNs through hidden
   metadata SQL.
+- Requests with both `DB` and GN selectors must reject cross-database GNs during
+  validation. Do not let `DB: "W3"` and `GN: "X.N.P1"` reach the server.
 - Unsupported native, request, subscription, metadata, or admin behavior returns
   the real error instead of trying another hidden path.
 
@@ -27,6 +29,25 @@ should own that behavior outside the base API.
 - Do not commit real hostnames, usernames, passwords, or production point names.
 - Mutation tests require opt-in environment variables and isolated object names.
 
+## Transport And Compression
+
+- Keep `DefaultOptions().Compression == CompressionNone`.
+- Valid public compression modes are only `CompressionNone`, `CompressionFrame`,
+  and `CompressionBlock`.
+- Login frames are always uncompressed. Set outbound compression after login.
+- `CompressionFrame` and `CompressionBlock` are strict: compression library
+  errors, compressed size greater than or equal to original size, malformed
+  checksums, unsupported wire modes, and decompression failures all return
+  errors. Never silently send the original payload after a strict compression
+  miss.
+- Server responses are decoded by the wire mode in the frame header, not by the
+  outbound mode chosen by the client.
+- Low-level `Conn` is intentionally narrow: `Ping`, `Close`, and
+  `CompressionMode`. Do not expose transport internals unless they are stable
+  driver primitives.
+- Context cancellation should unblock network I/O without leaving stale
+  deadlines on pooled connections.
+
 ## Public API Checklist
 
 When adding or changing a public API:
@@ -35,6 +56,7 @@ When adding or changing a public API:
 - Require bounded point/time scopes for time-series reads.
 - Classify errors through `operror` when crossing SDK boundaries.
 - Accept `context.Context` and preserve cancellation.
+- Validate GN database scope whenever the public request also has a `DB`.
 - Avoid background work that hides retries or extra reads from the caller.
 - Add documentation and examples when caller-facing behavior changes.
 - Preserve typed V5 semantics for RT/PT/DS/LC/AP/SG. `RT=0` is AX, not
@@ -77,6 +99,7 @@ Use these commands before completing broad work:
 go test ./... -count=1
 go test ./... -p=1 -count=1
 go test -tags safe_readonly ./tests -count=1
+go test -tags "safe_readonly compression_integration" ./tests -count=1
 go test -tags safe_readonly ./... -p=1 -count=1
 go test -tags mutation ./... -p=1 -count=1
 ```
