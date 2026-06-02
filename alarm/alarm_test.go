@@ -105,7 +105,7 @@ func TestHistoryQueryRejectsGNFromDifferentDatabase(t *testing.T) {
 	}
 }
 
-func TestAlarmFromOPConsoleProjectionDerivesActiveColor(t *testing.T) {
+func TestAlarmFromProjectedConfigFieldsDerivesActiveColor(t *testing.T) {
 	update := time.Date(2026, 1, 2, 3, 0, 0, 0, time.UTC)
 	row := sqlapi.Row{
 		"ID": int32(1001), "GN": "W3.N.P1", "RT": int8(model.TypeR8),

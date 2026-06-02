@@ -22,7 +22,7 @@ production connection details in examples.
 
 Examples:
 
-- `readonly`: metadata, realtime, safely quoted SQL scan, OPConsole-style
+- `readonly`: metadata, realtime, safely quoted SQL scan,
   system metrics, formula reference helpers, and native archive streaming.
 - `subscription`: visible subscription event stream.
 - `strategy`: application-owned archive native/request/SQL policy with

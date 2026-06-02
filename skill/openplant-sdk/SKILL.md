@@ -23,8 +23,7 @@ Preserve the explicit API contract:
 - Cross-path composition, retry layering, and native/request/SQL orchestration
   are not low-level SDK features. Keep them in application-owned code that
   exposes policy and trace.
-- Do not add hidden fallback, silent degradation, or compatibility paths copied
-  from legacy APIs.
+- Do not add hidden fallback, silent degradation, or alternate behavior paths.
 - If a path is not supported by the target database, return that error
   transparently instead of compensating with another protocol, broad scan, extra
   connection, or hidden retry.
@@ -58,7 +57,7 @@ Treat this repository as a low-level driver foundation:
 3. Keep API surfaces typed, narrow, and domain-specific.
 4. Add tests near the changed package. Add safe-readonly or mutation-tag tests
    only when behavior needs a real server boundary.
-5. Update README, examples, migration notes, or benchmark notes when public
+5. Update README, examples, contract notes, or benchmark notes when public
    behavior changes.
 6. Run `gofmt` and the smallest useful validation command, then broaden before
    finishing broad SDK changes.
@@ -72,7 +71,7 @@ Treat this repository as a low-level driver foundation:
 - `alarm`: bounded readonly active and historical alarm reads.
 - `subscription`: visible realtime ID event stream and explicit raw-row table
   subscriptions with reconnect status events.
-- `system`: OPConsole-style `DB.SYS.*` metric helpers and point templates.
+- `system`: `DB.SYS.*` metric helpers and point templates.
 - `mirror`: local mirror diagnostics; do not query mirror state implicitly.
 - `sql`: readonly SQL boundary and typed row scanner.
 - `admin`: guarded generic config/metadata mutation and typed mutation

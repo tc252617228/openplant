@@ -1,7 +1,7 @@
 # OpenPlant Go SDK
 
-This is the new OpenPlant V5 SDK module. It is intentionally separate from the
-legacy `github.com/tc252617228/op` module in `../op`.
+This is the OpenPlant V5 SDK module. It is designed as a predictable,
+single-purpose, driver-level foundation for OpenPlant applications.
 
 Current scope:
 
@@ -18,7 +18,7 @@ Current scope:
   ID or GN selectors
 - archive/stat native reads through `QueryNative` without SQL/request fallback
 - true streaming native archive/stat reads through `StreamNative`
-- explicit OPConsole-style archive snapshot SQL reads through
+- explicit archive snapshot SQL reads through
   `Archive().SnapshotSQL`, projecting `RT` and `FM` for typed display workflows
 - controlled mutation APIs for realtime native writes, archive native
   write/delete, and structured metadata/config table mutations
@@ -36,12 +36,12 @@ Current scope:
 - subscription events expose explicit kinds for data, terminal errors,
   reconnecting, and reconnected status changes
 - active and historical alarm read APIs over bounded readonly SQL, including
-  OPConsole-compatible projected alarm metadata such as `PN`, `AN`, `ED`,
+  projected alarm metadata such as `PN`, `AN`, `ED`,
   `EU`, `AP`, `LC`, and `C1..C8` when the server returns them
-- OPConsole-style system metric helpers over explicit readonly SQL for
+- system metric helpers over explicit readonly SQL for
   `DB.SYS.*` calculation points such as session count, load, cache queue, event
   rate, and calculation time
-- OPConsole-style `DB.SYS.*` point templates for admin tools; templates can be
+- `DB.SYS.*` point templates for admin tools; templates can be
   converted to `model.PointConfig` but are not written by the SDK
 - explicit `admin.TableMutation` builders for system point templates; callers
   still opt in by invoking `Admin().MutateTable`
@@ -65,8 +65,7 @@ Current scope:
 - safe-readonly integration coverage for metadata, realtime, archive, stat,
   native archive/stat, and alarm read paths
 - read-only SQL safety boundary
-- standard OpenPlant server error-code lookup metadata derived from the
-  official OPConsole locale files, including reconnect classification for
+- standard OpenPlant server error-code lookup metadata, including reconnect classification for
   network/transport codes
 - readonly integration-test environment scaffolding
 
@@ -155,10 +154,10 @@ archive/stat, and alarm paths have been exercised.
 
 ## Known Boundaries
 
-The root `docs` interface manuals describe broader legacy surfaces such as
+The root `docs` interface manuals describe broader OpenPlant surfaces such as
 generic `find/insert/update/remove`, native-by-name calls, and Realtime/Alarm/
-Point subscription variants. The base SDK does not hide those behind existing
-methods.
+Point subscription variants. The base SDK exposes only the explicit paths below
+and does not hide broader behavior behind existing methods.
 
 - Native base APIs stay ID-only. Use explicit metadata lookup first, or use
   SQL/request paths with GN selectors, such as `Realtime().QuerySQL` or
@@ -266,7 +265,7 @@ go test -tags 'safe_readonly soak' ./tests -run TestSafeReadonlySoak -v -count=1
 The V5 contract extracted from the provided PDFs is stored in
 `docs-contract.md`. It covers table shapes, DS/LC/AP/SG semantics, SQL modes,
 safe query constraints, calculation functions, replication/configuration
-fields, OPConsole-derived system metrics, and SDK safety rules. Treat it as the
+fields, system metrics, and SDK safety rules. Treat it as the
 local source of truth until a behavior is verified against a real V5 server.
 
 The repository-root `docs` directory is the primary source for product and API
@@ -280,7 +279,7 @@ stat, alarm, subscription, mirror, or admin behavior.
   typed row scanning helpers
 - `metadata`, `realtime`, `archive`, `stat`, `alarm`, `subscription`, `admin`:
   domain service boundaries
-- `system`: OPConsole-style `DB.SYS.*` readonly metrics and point templates
+- `system`: `DB.SYS.*` readonly metrics and point templates
 - `calc`: calculation formula function catalog, reference extraction, and
   lightweight linting/dependency diagnostics; no Lua execution
 - `mirror`: local mirror configuration diagnostics and sync-monitor discovery
@@ -291,6 +290,5 @@ See `docs-contract.md` for the V5 contract extracted from the provided PDFs.
 ## More
 
 - [Examples](examples/README.md)
-- [Migration notes](MIGRATION.md)
 - [Benchmark notes](benchmarks/README.md)
 - [AI skill](skill/openplant-sdk/SKILL.md)

@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestLookupServerCodeFromOPConsoleLocale(t *testing.T) {
+func TestLookupServerCodeMetadata(t *testing.T) {
 	tests := []struct {
 		code      ServerCode
 		name      string

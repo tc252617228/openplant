@@ -177,7 +177,7 @@ func TestArchiveRequestsRejectGNFromDifferentDatabase(t *testing.T) {
 	}
 }
 
-func TestArchiveSnapshotSQLUsesOPConsoleProjection(t *testing.T) {
+func TestArchiveSnapshotSQLUsesTypedProjection(t *testing.T) {
 	begin := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
 	end := begin.Add(time.Hour)
 	fake := &fakeQueryer{rows: []sqlapi.Row{{

@@ -116,9 +116,9 @@ Important fields:
 SDK metadata has two Point read shapes. `Metadata().FindPoints` returns a
 lightweight point identity/config subset for common lookups.
 `Metadata().FindPointConfigs` is an explicit SQL-only full configuration read
-that projects the documented Point configuration fields plus OPConsole's `OT`
-statistic offset field name. If a target server/version does not expose a
-projected configuration column, the server error is returned transparently.
+that projects the documented Point configuration fields plus the `OT` statistic
+offset field name. If a target server/version does not expose a projected
+configuration column, the server error is returned transparently.
 
 ### Node
 
@@ -191,8 +191,8 @@ Archive queries must include both point scope and time range. The SQL guide
 explicitly warns that history queries must include time period and point
 information.
 
-`Archive().SnapshotSQL` is an explicit SQL-only helper for OPConsole-style
-historical snapshots. It always uses `MODE='span'`, requires an interval, and
+`Archive().SnapshotSQL` is an explicit SQL-only helper for typed historical
+snapshots. It always uses `MODE='span'`, requires an interval, and
 projects `ID,GN,TM,DS,AV,RT,FM` so callers can decode the value type and use the
 configured display format. It remains separate from base `QuerySQL`, which keeps
 the documented archive projection.
@@ -260,8 +260,8 @@ Fields:
 - `DS int16`
 - `AV blob/value`
 
-OPConsole runtime logs from `opConsole-window/logs/OPConsol.log` show the
-console querying active alarms with static point projection fields:
+Active alarm queries may project static point fields together with dynamic alarm
+fields:
 
 ```sql
 select ID,GN,PN,AN,ED,EU,TM,TA,TF,AV,DS,RT,AP,LC,C1,C2,C3,C4,C5,C6,C7,C8
@@ -271,24 +271,22 @@ order by TM desc
 limit ...
 ```
 
-The SDK alarm model therefore preserves both the documented dynamic fields and
-the OPConsole display/configuration fields when they are projected:
+The SDK alarm model preserves both the documented dynamic fields and projected
+configuration fields when the server returns them:
 
 - `PN`, `AN`, `ED`, `EU`
 - `AP`
 - `LC`
 - `C1` through `C8`
 
-`DS` plus `RT`/`LC` is enough to derive the active alarm code for display. The
-console renders analog alarm colors from `C1..C8` and uses red for change
-alarms.
+`DS` plus `RT`/`LC` is enough to derive the active alarm code for display.
+Analog alarm colors come from `C1..C8`; change alarms use the change alarm
+display color.
 
-## OPConsole Error Code Notes
+## Server Error Code Notes
 
-`opConsole-window/conf/locale_zh.ini` and `locale_en.ini` list the user-facing
-server/runtime error code messages used by the official control console. The SDK
-keeps these as lookup metadata in `operror` so callers can classify server
-errors without parsing localized text.
+The SDK keeps OpenPlant server/runtime error code lookup metadata in `operror`
+so callers can classify server errors without parsing localized text.
 
 Notable code groups:
 
@@ -301,49 +299,44 @@ Notable code groups:
 - `200..206`: TCP/MTable transport errors.
 - `410..412`: user/password authentication errors.
 
-The OPConsole locale files contain a duplicated `ErrorCode-11` entry: first
-for "function not supported", later for "resource locked". The latter sits
-between `-114` and `-116`, so the SDK records it as `-115` rather than copying
-the duplicate key literally.
+The source code table contains a duplicated `ErrorCode-11` entry: first for
+"function not supported", later for "resource locked". The latter sits between
+`-114` and `-116`, so the SDK records it as `-115` rather than copying the
+duplicate key literally.
 
-## OPConsole Runtime SQL and UI Notes
+## Runtime SQL Notes
 
-The bundled web UI and the logs are useful references for real operational
-query shapes. They are not API design templates, but they confirm several V5
-contracts:
+Current SDK SQL helpers follow these V5 query-shape constraints:
 
 - Node lists use `select ID,PN,LC,ED,FQ,UD,ND,CT,GN,AR,OF,LO from W3.Node`.
 - Point lists commonly use lightweight fields first, then full point
   configuration fields only when the user switches table columns.
 - Active alarm polling is SQL-based and includes point static fields projected
   from `Alarm`.
-- Trend/chart queries read `Stat` and `Archive` separately; the default
-  console configuration uses `trendHisMode=plot`.
+- Trend queries read `Stat` and `Archive` separately.
 - Historical snapshot uses `Archive` `MODE='SPAN'` with an interval such as
   `2s`, first querying distinct timestamps, then reading
   `ID,GN,TM,DS,AV,RT,FM` values ordered by `TM`.
-- OPConsole point and alarm filters render `LIKE ... ESCAPE '\'`; this avoids
+- Point and alarm filters render `LIKE ... ESCAPE '\'`; this avoids
   treating `_` or `%` in point names/descriptions as wildcards.
-- OPConsole's SQL help explicitly demonstrates static point-field projection
-  from dynamic tables, for example querying point fields from `Alarm`.
-- OPConsole v3.0.0 notes say OpenPlant 5.0.4 `Realtime`, `Archive`, and
-  `Alarm` do not support subqueries. SDK SQL helpers should keep generating
-  explicit bounded `IN (...)` predicates rather than subquery-dependent forms.
+- Dynamic tables can project static point fields, for example querying point
+  fields from `Alarm`.
+- OpenPlant V5 `Realtime`, `Archive`, and `Alarm` do not reliably support
+  subqueries. SDK SQL helpers should keep generating explicit bounded `IN (...)`
+  predicates rather than subquery-dependent forms.
 
-UI formatting facts mirrored by SDK helpers:
+Status/alarm formatting facts mirrored by SDK helpers:
 
 - `DS` display order is nil value, timeout, forced, bad, good.
 - `DSBIN` is a grouped 16-bit binary string.
-- OPConsole treats `DS` analog alarm bits `2,10,3,11,4,12,5,13,15` as
+- Analog alarm bits `2,10,3,11,4,12,5,13,15` map to
   `LL,ZL,L3,L4,HL,ZH,H3,H4,Change`.
 - DX alarm display uses `LC=0` for no alarm, `1` for transition to 0, `2` for
   transition to 1, and `3` for any change.
 
 ### System Metrics
 
-OPConsole ships `views/public/static/opconsole/SYS.csv` with calculation point
-templates under `DB.SYS.*`. Runtime logs show the console trending these points
-through `Archive MODE='span'` using GNs such as:
+OpenPlant system metrics use `DB.SYS.*` calculation points such as:
 
 - `DB.SYS.SESSION`
 - `DB.SYS.SESSIONPEAK`
@@ -357,13 +350,13 @@ explicit SQL helpers: current values read `Realtime`, history reads `Archive`
 with `MODE='span'` and a required interval. They do not use native reads,
 request/select, metadata lookup, or fallback.
 
-The system metric catalog mirrors OPConsole templates such as `op.cacheq`,
+The system metric catalog includes templates such as `op.cacheq`,
 `op.session`, `op.session_peak`, `op.rate`, `op.dbload`, `op.dbmem`,
 `op.memfree`, `op.volfree`, `op.voltotal`, `op.uptime`, and `op.calc_time`.
 Formula strings are catalog/reference data only; SDK code does not execute Lua.
 
-`SystemPointTemplates` exposes the same `DB.SYS.*` calculation point templates
-as structured `PointTemplate` values. `PointTemplate.PointConfig()` is a local
+`SystemPointTemplates` exposes `DB.SYS.*` calculation point templates as
+structured `PointTemplate` values. `PointTemplate.PointConfig()` is a local
 conversion helper for explicit admin tooling; the SDK does not insert or update
 those points automatically.
 
@@ -406,9 +399,8 @@ Verified SDK policy:
   path. It encodes `<db>.<table>` request/select subscriptions with caller
   supplied columns, key, index values, `Async=1`, and optional `Snapshot`.
 - Real V5 verification on 2026-04-29 confirmed snapshot payload decoding for
-  `Point` with columns `ID, GN, PN, RT, ED`, and for `Alarm` with OPConsole
-  projected columns `ID, GN, PN, AN, ED, EU, TM, TA, TF, AV, DS, RT, AP, LC,
-  C1..C8`.
+  `Point` with columns `ID, GN, PN, RT, ED`, and for `Alarm` with projected
+  columns `ID, GN, PN, AN, ED, EU, TM, TA, TF, AV, DS, RT, AP, LC, C1..C8`.
 
 Boundaries:
 
@@ -517,7 +509,7 @@ probe stay uncompressed. After login, business frames use the configured
 compression mode:
 
 - `0 = none`
-- `1 = LZ4 frame` with OpenPlant's documented legacy frame bytes and XXH32
+- `1 = LZ4 frame` with OpenPlant's documented frame bytes and XXH32
   content checksum
 - `2 = LZ4 block`
 
@@ -704,8 +696,8 @@ SDK policy:
 - User-provided values must be escaped or represented through structured
   builders.
 - User-provided `LIKE` fragments must escape `\`, `%`, and `_` and render an
-  explicit `ESCAPE '\'` clause. OPConsole logs and changelogs show this matters
-  for point/alarm filters containing underscores.
+  explicit `ESCAPE '\'` clause so point/alarm filters containing underscores are
+  treated literally.
 - Native SDK methods require explicit point IDs. They do not resolve GNs or
   enrich native results through metadata SQL, metadata cache, or request/select
   behind the caller's back.

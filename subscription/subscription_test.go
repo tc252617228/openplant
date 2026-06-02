@@ -195,21 +195,21 @@ func TestSubscribeTableRequiresConfiguredTableSource(t *testing.T) {
 	}
 }
 
-func TestEventKindHelpersAcceptLegacyEvents(t *testing.T) {
+func TestEventKindHelpersAcceptZeroKindEvents(t *testing.T) {
 	if !(Event{Sample: model.Sample{ID: 1001}}).IsData() {
-		t.Fatalf("legacy sample event should be data")
+		t.Fatalf("zero-kind sample event should be data")
 	}
-	if !(Event{Err: errors.New("legacy error")}).IsError() {
-		t.Fatalf("legacy error event should be error")
+	if !(Event{Err: errors.New("zero-kind error")}).IsError() {
+		t.Fatalf("zero-kind error event should be error")
 	}
 	if (Event{Kind: EventReconnected}).IsData() {
 		t.Fatalf("status event should not be data")
 	}
 	if !(TableEvent{Row: map[string]any{"ID": int32(1001)}}).IsData() {
-		t.Fatalf("legacy table row event should be data")
+		t.Fatalf("zero-kind table row event should be data")
 	}
-	if !(TableEvent{Err: errors.New("legacy error")}).IsError() {
-		t.Fatalf("legacy table error event should be error")
+	if !(TableEvent{Err: errors.New("zero-kind error")}).IsError() {
+		t.Fatalf("zero-kind table error event should be error")
 	}
 }
 

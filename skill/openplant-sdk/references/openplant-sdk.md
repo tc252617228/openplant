@@ -61,7 +61,7 @@ When adding or changing a public API:
 - Add documentation and examples when caller-facing behavior changes.
 - Preserve typed V5 semantics for RT/PT/DS/LC/AP/SG. `RT=0` is AX, not
   unknown; point security groups are a four-byte bitset.
-- Keep OPConsole-derived system metrics as explicit SQL helpers under
+- Keep system metrics as explicit SQL helpers under
   `system`; do not make them a fallback or metadata-enrichment path.
 - Keep raw table subscription explicit. `SubscribeTable` requires DB, table,
   key, and index values, and returns row maps. Typed Point/Alarm conversion
@@ -86,7 +86,6 @@ Keep these files current when public behavior changes:
 
 - `README.md`: high-level scope, safety defaults, package map, links.
 - `examples/`: compilable usage examples.
-- `MIGRATION.md`: legacy-to-new behavior and API mapping.
 - `docs-contract.md`: extracted V5 contract notes.
 - `benchmarks/README.md`: benchmark entry points.
 - `skill/openplant-sdk/`: AI-facing usage and maintenance instructions.
@@ -121,5 +120,5 @@ go test -tags 'safe_readonly soak' ./tests -run TestSafeReadonlySoak -v -count=1
 
 Use `docs-contract.md` as the local structured knowledge base for table fields,
 DS/LC/AP/SG semantics, SQL mode behavior, calculation function facts,
-replication/configuration fields, OPConsole-derived system metrics, and SDK
+replication/configuration fields, system metrics, and SDK
 safety rules.

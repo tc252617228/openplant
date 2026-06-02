@@ -128,7 +128,7 @@ var serverCodeInfo = map[ServerCode]ServerCodeInfo{
 	ServerCodeMismatch:           codeInfo(ServerCodeMismatch, "Mismatch", "Mismatch", ServerCodeClassProtocol, false),
 	ServerCodeParameterError:     codeInfo(ServerCodeParameterError, "ParameterError", "Parameter error", ServerCodeClassProtocol, false),
 	ServerCodeOutdated:           codeInfo(ServerCodeOutdated, "Outdated", "Outdated", ServerCodeClassRuntime, false),
-	// OPConsole locale files repeat ErrorCode-11 for "Resource locked"; the surrounding
+	// The source code table repeats ErrorCode-11 for "Resource locked"; the surrounding
 	// contiguous server-code sequence indicates the intended code is -115.
 	ServerCodeResourceLocked: codeInfo(ServerCodeResourceLocked, "ResourceLocked", "Resource locked", ServerCodeClassRuntime, false),
 	ServerCodeUninitialized:  codeInfo(ServerCodeUninitialized, "Uninitialized", "Uninitialized", ServerCodeClassRuntime, false),
